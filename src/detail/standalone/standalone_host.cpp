@@ -115,7 +115,6 @@ void StandaloneHost::clapProcess(void *pOutput, const void *pInput, uint32_t fra
     return;
   }
 
-  auto f = (float *)pOutput;
   clap_process process;
   process.transport = nullptr;
   process.in_events = &inputEvents;
@@ -142,22 +141,21 @@ void StandaloneHost::clapProcess(void *pOutput, const void *pInput, uint32_t fra
   process.audio_inputs = &(buffers[0]);
   for (auto inp = 0U; inp < numAudioInputs; ++inp)
   {
-    // For now assert sterep
-    assert(inputChannelByBus[inp] == 2);
-    bufferChanPtr[ptrIdx] = &(utilityBuffer[ptrIdx][0]);
-    memset(bufferChanPtr[ptrIdx], 0, frameCount * sizeof(float));
-    ptrIdx++;
-    bufferChanPtr[ptrIdx] = &(utilityBuffer[ptrIdx][0]);
-    memset(bufferChanPtr[ptrIdx], 0, frameCount * sizeof(float));
-    ptrIdx++;
+    auto channelCount = inputChannelByBus[inp];
+    for (auto channel = 0U; channel < channelCount; ++channel)
+    {
+      bufferChanPtr[ptrIdx] = &(utilityBuffer[ptrIdx][0]);
+      memset(bufferChanPtr[ptrIdx], 0, frameCount * sizeof(float));
+      ptrIdx++;
+    }
 
-    buffers[bufIdx].channel_count = 2;
-    buffers[bufIdx].data32 = &(bufferChanPtr[ptrIdx - 2]);
+    buffers[bufIdx].channel_count = channelCount;
+    buffers[bufIdx].data32 = &(bufferChanPtr[ptrIdx - channelCount]);
 
     if (mainInIdx < 0)
     {
       // TODO cleaner
-      mainInIdx = (int32_t)(ptrIdx - 2);
+      mainInIdx = (int32_t)(ptrIdx - channelCount);
     }
     bufIdx++;
   }
@@ -165,32 +163,33 @@ void StandaloneHost::clapProcess(void *pOutput, const void *pInput, uint32_t fra
   process.audio_outputs = &(buffers[bufIdx]);
   for (auto oup = 0U; oup < numAudioOutputs; ++oup)
   {
-    // For now assert sterep
-    assert(outputChannelByBus[oup] == 2);
-    bufferChanPtr[ptrIdx] = &(utilityBuffer[ptrIdx][0]);
-    ptrIdx++;
-    bufferChanPtr[ptrIdx] = &(utilityBuffer[ptrIdx][0]);
-    ptrIdx++;
+    auto channelCount = outputChannelByBus[oup];
+    for (auto channel = 0U; channel < channelCount; ++channel)
+    {
+      bufferChanPtr[ptrIdx] = &(utilityBuffer[ptrIdx][0]);
+      ptrIdx++;
+    }
 
-    buffers[bufIdx].channel_count = 2;
-    buffers[bufIdx].data32 = &(bufferChanPtr[ptrIdx - 2]);
+    buffers[bufIdx].channel_count = channelCount;
+    buffers[bufIdx].data32 = &(bufferChanPtr[ptrIdx - channelCount]);
 
     if (mainOutIdx < 0)
     {
       // TODO cleaner
-      mainOutIdx = (int32_t)(ptrIdx - 2);
+      mainOutIdx = (int32_t)(ptrIdx - channelCount);
     }
 
     bufIdx++;
   }
 
-  if (mainInIdx >= 0 && pInput)
+  // De-interleave input channel data
+  for (auto channel = 0U; channel < totalInputChannels; ++channel)
   {
-    auto *g = (const float *)pInput;
+    auto *g = ((const float *)pInput) + channel;
     for (auto i = 0U; i < frameCount; ++i)
     {
-      utilityBuffer[mainInIdx][i] = g[2 * i];
-      utilityBuffer[mainInIdx + 1][i] = g[2 * i + 1];
+      utilityBuffer[channel][i] = *g;
+      g += totalInputChannels;
     }
   }
 
@@ -211,10 +210,15 @@ void StandaloneHost::clapProcess(void *pOutput, const void *pInput, uint32_t fra
 
   clapPlugin->_plugin->process(clapPlugin->_plugin, &process);
 
-  for (auto i = 0U; i < frameCount; ++i)
+  // Interleave output channel data
+  for (auto channel = 0U; channel < totalOutputChannels; ++channel)
   {
-    f[2 * i] = utilityBuffer[mainOutIdx][i];
-    f[2 * i + 1] = utilityBuffer[mainOutIdx + 1][i];
+    auto f = (float *)pOutput + channel;
+    for (auto i = 0U; i < frameCount; ++i)
+    {
+      *f = utilityBuffer[mainOutIdx + channel][i];
+      f += totalOutputChannels;
+    }
   }
 }
 
