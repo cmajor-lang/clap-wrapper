@@ -41,7 +41,7 @@ if (APPLE)
     target_link_libraries(clap-wrapper-compile-options INTERFACE macos_filesystem_support)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(clap-wrapper-compile-options INTERFACE -Wall -Wextra -Wno-unused-parameter  -Wno-deprecated-copy)
+    target_compile_options(clap-wrapper-compile-options INTERFACE -Wall -Wextra -Wno-unused-parameter -Wpedantic)
     if (WIN32)
         # CLang cant do werror on linux thanks to vst3 sdk
         if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
