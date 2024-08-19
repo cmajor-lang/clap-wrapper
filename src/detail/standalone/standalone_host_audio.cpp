@@ -88,7 +88,7 @@ void StandaloneHost::startAudioThread()
   else
   {
     auto [in, out, sr] = getDefaultAudioInOutSampleRate();
-    startAudioThreadOn(in, 2, numAudioInputs > 0, out, 2, numAudioOutputs > 0, sr);
+    startAudioThreadOn(in, numAudioInputs, numAudioInputs > 0, out, numAudioOutputs, numAudioOutputs > 0, sr);
   }
 }
 
